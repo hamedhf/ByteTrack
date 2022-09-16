@@ -13,10 +13,16 @@ from yolox.utils import fuse_model, get_model_info, postprocess
 from yolox.utils.visualize import plot_tracking
 from yolox.tracker.byte_tracker import BYTETracker
 from yolox.tracking_utils.timer import Timer
+import sqlite3
+import importlib.util
+import sys
 
 
 IMAGE_EXT = [".jpg", ".jpeg", ".webp", ".bmp", ".png"]
-
+spec = importlib.util.spec_from_file_location("detect_mask_image", "/content/Face-Mask-Detection/detect_mask_image.py")
+mask = importlib.util.module_from_spec(spec)
+sys.modules["detect_mask_image"] = mask
+spec.loader.exec_module(mask)
 
 def make_parser():
     parser = argparse.ArgumentParser("ByteTrack Demo!")
@@ -233,7 +239,7 @@ def image_demo(predictor, vis_folder, current_time, args):
         logger.info(f"save results to {res_file}")
 
 
-def imageflow_demo(predictor, vis_folder, current_time, args):
+def imageflow_demo(predictor: Predictor, vis_folder, current_time, args):
     cap = cv2.VideoCapture(args.path if args.demo == "video" else args.camid)
     width = cap.get(cv2.CAP_PROP_FRAME_WIDTH)  # float
     height = cap.get(cv2.CAP_PROP_FRAME_HEIGHT)  # float
@@ -253,6 +259,8 @@ def imageflow_demo(predictor, vis_folder, current_time, args):
     timer = Timer()
     frame_id = 0
     results = []
+    conn = sqlite3.connect('/content/track.db')
+    print("Opened database successfully")
     while True:
         if frame_id % 20 == 0:
             logger.info('Processing frame {} ({:.2f} fps)'.format(frame_id, 1. / max(1e-5, timer.average_time)))
@@ -267,6 +275,13 @@ def imageflow_demo(predictor, vis_folder, current_time, args):
                 for t in online_targets:
                     tlwh = t.tlwh
                     tid = t.track_id
+                    query = f"""
+                            INSERT OR IGNORE INTO
+                            target(target_id, gender)
+                            VALUES({tid}, 'unknown');
+                            """
+                    conn.execute(query)
+                    conn.commit()
                     vertical = tlwh[2] / tlwh[3] > args.aspect_ratio_thresh
                     if tlwh[2] * tlwh[3] > args.min_box_area and not vertical:
                         online_tlwhs.append(tlwh)
@@ -275,6 +290,17 @@ def imageflow_demo(predictor, vis_folder, current_time, args):
                         results.append(
                             f"{frame_id},{tid},{tlwh[0]:.2f},{tlwh[1]:.2f},{tlwh[2]:.2f},{tlwh[3]:.2f},{t.score:.2f},-1,-1,-1\n"
                         )
+                        x, y, w, h = int(tlwh[0]), int(tlwh[1]), int(tlwh[2]), int(tlwh[3])
+                        cropped_image = img_info['raw_img'][y:y+h, x:x+w]
+                        mask_label = mask.mask_image(
+                            input_image = cropped_image
+                        )
+                        query = f"""
+                                INSERT OR IGNORE INTO frame_target
+                                VALUES({frame_id}, {tid}, {mask_label}, {tlwh[0]:.2f}, {tlwh[1]:.2f}, {tlwh[2]:.2f}, {tlwh[3]:.2f});
+                                """
+                        conn.execute(query)
+                        conn.commit()
                 timer.toc()
                 online_im = plot_tracking(
                     img_info['raw_img'], online_tlwhs, online_ids, frame_id=frame_id + 1, fps=1. / timer.average_time
@@ -282,6 +308,7 @@ def imageflow_demo(predictor, vis_folder, current_time, args):
             else:
                 timer.toc()
                 online_im = img_info['raw_img']
+                
             if args.save_result:
                 vid_writer.write(online_im)
             ch = cv2.waitKey(1)
@@ -297,6 +324,7 @@ def imageflow_demo(predictor, vis_folder, current_time, args):
             f.writelines(results)
         logger.info(f"save results to {res_file}")
 
+    conn.close()
 
 def main(exp, args):
     if not args.experiment_name:
