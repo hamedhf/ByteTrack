@@ -292,7 +292,7 @@ def imageflow_demo(predictor: Predictor, vis_folder, current_time, args):
                         )
                         x, y, w, h = int(tlwh[0]), int(tlwh[1]), int(tlwh[2]), int(tlwh[3])
                         cropped_image = img_info['raw_img'][y:y+h, x:x+w]
-                        mask_label = mask.mask_image(
+                        mask_label = mask.mask_detector(
                             input_image = cropped_image
                         )
                         query = f"""
@@ -308,7 +308,7 @@ def imageflow_demo(predictor: Predictor, vis_folder, current_time, args):
             else:
                 timer.toc()
                 online_im = img_info['raw_img']
-                
+
             if args.save_result:
                 vid_writer.write(online_im)
             ch = cv2.waitKey(1)
