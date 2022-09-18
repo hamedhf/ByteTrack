@@ -296,7 +296,7 @@ def imageflow_demo(predictor: Predictor, vis_folder, current_time, args):
                             input_image = cropped_image
                         )
                         query = f"""
-                                INSERT OR IGNORE INTO frame_target
+                                INSERT OR IGNORE INTO frame_target(frame_id, target_id, mask, x, y, w, h)
                                 VALUES({frame_id}, {tid}, {mask_label}, {tlwh[0]:.2f}, {tlwh[1]:.2f}, {tlwh[2]:.2f}, {tlwh[3]:.2f});
                                 """
                         conn.execute(query)
