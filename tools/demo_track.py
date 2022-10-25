@@ -25,9 +25,9 @@ sys.modules["detect_mask_image"] = mask
 spec.loader.exec_module(mask)
 
 spec = importlib.util.spec_from_file_location("detect_gender", "/content/Gender-and-Age-Detection/detect_gender.py")
-gender = importlib.util.module_from_spec(spec)
-sys.modules["detect_gender"] = gender
-spec.loader.exec_module(gender)
+gender_detector = importlib.util.module_from_spec(spec)
+sys.modules["detect_gender"] = gender_detector
+spec.loader.exec_module(gender_detector)
 
 def make_parser():
     parser = argparse.ArgumentParser("ByteTrack Demo!")
@@ -293,7 +293,7 @@ def imageflow_demo(predictor: Predictor, vis_folder, current_time, args):
                         mask_label = mask.mask_detector(
                             input_image = cropped_image
                         )
-                        gender, age = gender.gender_detector(cropped_image)
+                        gender, age = gender_detector.gender_detector(cropped_image)
 
                         query = f"""
                             INSERT OR IGNORE INTO
