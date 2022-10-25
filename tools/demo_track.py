@@ -24,6 +24,11 @@ mask = importlib.util.module_from_spec(spec)
 sys.modules["detect_mask_image"] = mask
 spec.loader.exec_module(mask)
 
+spec = importlib.util.spec_from_file_location("detect_gender", "/content/Gender-and-Age-Detection/detect_gender.py")
+gender = importlib.util.module_from_spec(spec)
+sys.modules["detect_gender"] = gender
+spec.loader.exec_module(gender)
+
 def make_parser():
     parser = argparse.ArgumentParser("ByteTrack Demo!")
     parser.add_argument(
@@ -275,13 +280,6 @@ def imageflow_demo(predictor: Predictor, vis_folder, current_time, args):
                 for t in online_targets:
                     tlwh = t.tlwh
                     tid = t.track_id
-                    query = f"""
-                            INSERT OR IGNORE INTO
-                            target(target_id, gender)
-                            VALUES({tid}, 'unknown');
-                            """
-                    conn.execute(query)
-                    conn.commit()
                     vertical = tlwh[2] / tlwh[3] > args.aspect_ratio_thresh
                     if tlwh[2] * tlwh[3] > args.min_box_area and not vertical:
                         online_tlwhs.append(tlwh)
@@ -295,6 +293,16 @@ def imageflow_demo(predictor: Predictor, vis_folder, current_time, args):
                         mask_label = mask.mask_detector(
                             input_image = cropped_image
                         )
+                        gender, age = gender.gender_detector(cropped_image)
+
+                        query = f"""
+                            INSERT OR IGNORE INTO
+                            target(target_id, gender)
+                            VALUES({tid}, {gender}');
+                            """
+                        conn.execute(query)
+                        conn.commit()
+
                         query = f"""
                                 INSERT OR IGNORE INTO frame_target(frame_id, target_id, mask, x, y, w, h)
                                 VALUES({frame_id}, {tid}, '{mask_label}', {tlwh[0]:.2f}, {tlwh[1]:.2f}, {tlwh[2]:.2f}, {tlwh[3]:.2f});
