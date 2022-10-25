@@ -298,7 +298,7 @@ def imageflow_demo(predictor: Predictor, vis_folder, current_time, args):
                         query = f"""
                             INSERT OR IGNORE INTO
                             target(target_id, gender)
-                            VALUES({tid}, {gender}');
+                            VALUES({tid}, '{gender}');
                             """
                         conn.execute(query)
                         conn.commit()
