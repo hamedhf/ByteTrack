@@ -293,7 +293,7 @@ def imageflow_demo(predictor: Predictor, vis_folder, current_time, args):
                         mask_label = mask.mask_detector(
                             input_image = cropped_image
                         )
-                        gender, age = gender_detector.gender_detector(cropped_image)
+                        gender, age = gender_detector.detect_gender(cropped_image)
 
                         query = f"""
                             INSERT OR IGNORE INTO
