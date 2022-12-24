@@ -17,7 +17,6 @@ import sqlite3
 import importlib.util
 import sys
 
-
 IMAGE_EXT = [".jpg", ".jpeg", ".webp", ".bmp", ".png"]
 spec = importlib.util.spec_from_file_location("detect_mask_image", "/content/Face-Mask-Detection/detect_mask_image.py")
 mask = importlib.util.module_from_spec(spec)
@@ -29,16 +28,19 @@ gender_detector = importlib.util.module_from_spec(spec)
 sys.modules["detect_gender"] = gender_detector
 spec.loader.exec_module(gender_detector)
 
+
 def make_parser():
     parser = argparse.ArgumentParser("ByteTrack Demo!")
     parser.add_argument(
         "demo", default="image", help="demo type, eg. image, video and webcam"
     )
+    parser.add_argument("--mask", type=bool, default=False)
+    parser.add_argument("--gender", type=bool, default=False)
     parser.add_argument("-expn", "--experiment-name", type=str, default=None)
     parser.add_argument("-n", "--name", type=str, default=None, help="model name")
 
     parser.add_argument(
-        #"--path", default="./datasets/mot/train/MOT17-05-FRCNN/img1", help="path to images or video"
+        # "--path", default="./datasets/mot/train/MOT17-05-FRCNN/img1", help="path to images or video"
         "--path", default="./videos/palace.mp4", help="path to images or video"
     )
     parser.add_argument("--camid", type=int, default=0, help="webcam demo camera id")
@@ -120,20 +122,21 @@ def write_results(filename, results):
                 if track_id < 0:
                     continue
                 x1, y1, w, h = tlwh
-                line = save_format.format(frame=frame_id, id=track_id, x1=round(x1, 1), y1=round(y1, 1), w=round(w, 1), h=round(h, 1), s=round(score, 2))
+                line = save_format.format(frame=frame_id, id=track_id, x1=round(x1, 1), y1=round(y1, 1), w=round(w, 1),
+                                          h=round(h, 1), s=round(score, 2))
                 f.write(line)
     logger.info('save results to {}'.format(filename))
 
 
 class Predictor(object):
     def __init__(
-        self,
-        model,
-        exp,
-        trt_file=None,
-        decoder=None,
-        device=torch.device("cpu"),
-        fp16=False
+            self,
+            model,
+            exp,
+            trt_file=None,
+            decoder=None,
+            device=torch.device("cpu"),
+            fp16=False
     ):
         self.model = model
         self.decoder = decoder
@@ -182,7 +185,7 @@ class Predictor(object):
             outputs = postprocess(
                 outputs, self.num_classes, self.confthre, self.nmsthre
             )
-            #logger.info("Infer time: {:.4f}s".format(time.time() - t0))
+            # logger.info("Infer time: {:.4f}s".format(time.time() - t0))
         return outputs, img_info
 
 
@@ -288,12 +291,22 @@ def imageflow_demo(predictor: Predictor, vis_folder, current_time, args):
                         results.append(
                             f"{frame_id},{tid},{tlwh[0]:.2f},{tlwh[1]:.2f},{tlwh[2]:.2f},{tlwh[3]:.2f},{t.score:.2f},-1,-1,-1\n"
                         )
-                        x, y, w, h = int(tlwh[0]), int(tlwh[1]), int(tlwh[2]), int(tlwh[3])
-                        cropped_image = img_info['raw_img'][y:y+h, x:x+w]
-                        mask_label = mask.mask_detector(
-                            input_image = cropped_image
-                        )
-                        gender, age = gender_detector.detect_gender(cropped_image)
+
+                        # mask detection
+                        if args.mask:
+                            x, y, w, h = int(tlwh[0]), int(tlwh[1]), int(tlwh[2]), int(tlwh[3])
+                            cropped_image = img_info['raw_img'][y:y + h, x:x + w]
+                            mask_label = mask.mask_detector(
+                                input_image=cropped_image
+                            )
+                        else:
+                            mask_label = "No Mask"
+
+                        # gender detection
+                        if args.gender:
+                            gender, age = gender_detector.detect_gender(cropped_image)
+                        else:
+                            gender, age = "Male", "None"
 
                         query = f"""
                             INSERT OR IGNORE INTO
@@ -333,6 +346,7 @@ def imageflow_demo(predictor: Predictor, vis_folder, current_time, args):
         logger.info(f"save results to {res_file}")
 
     conn.close()
+
 
 def main(exp, args):
     if not args.experiment_name:
